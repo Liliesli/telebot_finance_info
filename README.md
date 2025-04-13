@@ -13,7 +13,7 @@
 
 1. 저장소 클론
 ```bash
-git clone [저장소 URL]
+git clone https://github.com/Liliesli/telebot_finance_info.git
 ```
 
 2. 필요한 패키지 설치
@@ -38,4 +38,4 @@ TELEGRAM_CHANNEL_ID=your_channel_id
 
 - Python
 - python-telegram-bot
-- yfinance 
+- yfinance
