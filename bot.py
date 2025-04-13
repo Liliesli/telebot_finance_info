@@ -9,6 +9,8 @@ import traceback
 import time
 from datetime import datetime, timedelta
 from requests.exceptions import RequestException
+import random
+import asyncio
 
 # 로깅 설정
 logging.basicConfig(
@@ -20,6 +22,11 @@ logging.basicConfig(
 load_dotenv()
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID')
+PORT = int(os.environ.get('PORT', '8080'))
+
+# Yahoo Finance API 요청 제한 처리를 위한 지연 시간 (초)
+MIN_DELAY = 2  # 최소 2초 대기
+MAX_DELAY = 5  # 최대 5초 대기
 
 # 캐시 저장소
 stock_cache = {}
@@ -77,17 +84,16 @@ async def get_stock_data(ticker):
         return stock_cache[ticker]['data']
     
     try:
+        # API 요청 제한을 피하기 위한 랜덤 지연
+        delay = random.uniform(MIN_DELAY, MAX_DELAY)
+        await asyncio.sleep(delay)
+        
         stock = yf.Ticker(ticker)
         # 기본 정보 확인
         info = stock.info
         if not info:
             raise Exception("주식 정보를 가져올 수 없습니다.")
         
-        # 기본 정보 가져오기
-        info = stock.info
-        if not info:
-            raise Exception("주식 정보를 가져올 수 없습니다.")
-
         # 현재 가격과 기본 정보
         current_price = info.get('regularMarketPrice', 0)
         previous_close = info.get('previousClose', 0)
@@ -104,7 +110,8 @@ async def get_stock_data(ticker):
         if not current_price or not previous_close:
             raise Exception("가격 정보를 가져올 수 없습니다.")
         
-        return {
+        # 캐시 업데이트
+        stock_data = {
             'company_name': company_name,
             'current_price': current_price,
             'previous_close': previous_close,
@@ -115,6 +122,14 @@ async def get_stock_data(ticker):
             'volume': volume,
             'avg_volume': avg_volume
         }
+        
+        stock_cache[ticker] = {
+            'data': stock_data,
+            'timestamp': datetime.now()
+        }
+        
+        return stock_data
+        
     except Exception as e:
         print(f"주식 데이터 가져오기 실패: {str(e)}")
         print(traceback.format_exc())
@@ -220,7 +235,16 @@ def main():
     
     # 봇 실행
     print("봇이 메시지 대기 중...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    # Render.com을 위한 웹훅 설정
+    if os.environ.get('RENDER'):
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=PORT,
+            webhook_url=os.environ.get('RENDER_EXTERNAL_URL')
+        )
+    else:
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
     main() 
