@@ -126,14 +126,6 @@ MAX_DELAY = 5  # 최대 5초 대기
 stock_cache = {}
 CACHE_DURATION = timedelta(minutes=5)  # 5분간 캐시 유지
 
-@app.on_event("startup")
-async def startup_event():
-
-    # ping 스레드 시작
-    ping_thread = threading.Thread(target=ping_server, daemon=True)
-    ping_thread.start()
-
-
 def format_large_number(number):
     """큰 숫자를 읽기 쉽게 포맷팅합니다."""
     if number >= 1_000_000_000:
