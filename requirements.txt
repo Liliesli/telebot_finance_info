@@ -1,4 +1,6 @@
-python-telegram-bot[webhooks]==20.8
-yfinance==0.2.55
-python-dotenv==1.0.1
+python-telegram-bot==20.7
+python-dotenv==1.0.0
+yfinance==0.2.36
+requests==2.31.0
+psycopg2-binary==2.9.9
 backoff==2.2.1 

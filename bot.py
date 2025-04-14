@@ -13,16 +13,65 @@ import random
 import asyncio
 import requests
 import threading
+import psycopg2
+from psycopg2 import pool
 
+# PostgreSQL 연결 풀 설정
+def get_db_pool():
+    try:
+        return pool.SimpleConnectionPool(
+            minconn=1,
+            maxconn=10,
+            dsn=os.getenv('DATABASE_URL')
+        )
+    except Exception as e:
+        logger.error(f"PostgreSQL 연결 풀 생성 실패: {str(e)}")
+        return None
 
-# 로깅 설정
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+# 데이터베이스 연결 풀 초기화
+db_pool = get_db_pool()
 
+def init_db():
+    """데이터베이스 테이블 초기화"""
+    try:
+        conn = db_pool.getconn()
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chat_logs (
+                    id SERIAL PRIMARY KEY,
+                    timestamp TIMESTAMP WITH TIME ZONE,
+                    chat_id BIGINT,
+                    username TEXT,
+                    message TEXT
+                )
+            """)
+            conn.commit()
+    except Exception as e:
+        logger.error(f"데이터베이스 초기화 실패: {str(e)}")
+    finally:
+        if conn:
+            db_pool.putconn(conn)
 
-logger = logging.getLogger(__name__)
+def save_chat_log(chat_data):
+    """채팅 로그를 PostgreSQL에 저장합니다."""
+    try:
+        conn = db_pool.getconn()
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO chat_logs (timestamp, chat_id, username, message)
+                VALUES (%s, %s, %s, %s)
+            """, (
+                chat_data['timestamp'],
+                chat_data['chat_id'],
+                chat_data['user'],
+                chat_data['message']
+            ))
+            conn.commit()
+    except Exception as e:
+        logger.error(f"채팅 로그 저장 중 오류 발생: {str(e)}")
+    finally:
+        if conn:
+            db_pool.putconn(conn)
 
 # 로그 기록용 함수
 async def log_interaction(update: Update):
@@ -30,6 +79,19 @@ async def log_interaction(update: Update):
     user = update.effective_user.username or update.effective_user.full_name
     message = update.message.text
     timestamp = datetime.now().isoformat()
+    
+    # 로그 데이터 구성
+    chat_data = {
+        "timestamp": timestamp,
+        "chat_id": chat_id,
+        "user": user,
+        "message": message
+    }
+    
+    # 로그 저장
+    save_chat_log(chat_data)
+    
+    # 기존 로깅도 유지
     logger.info(f"[{timestamp}] ChatID: {chat_id}, User: {user}, Message: {message}")
     print(f"[{timestamp}] ChatID: {chat_id}, User: {user}, Message: {message}")
 
@@ -273,6 +335,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     """봇을 실행합니다."""
     logger.info("봇 시작 중...")
+    
+    # 데이터베이스 초기화
+    init_db()
     
     # 핑 스레드 시작
     ping_thread = threading.Thread(target=ping_server, daemon=True)
