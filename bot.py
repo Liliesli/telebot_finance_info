@@ -18,11 +18,29 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+
+logger = logging.getLogger(__name__)
+
+# 로그 기록용 함수
+async def log_interaction(update: Update):
+    chat_id = update.effective_chat.id
+    user = update.effective_user.username or update.effective_user.full_name
+    message = update.message.text
+    timestamp = datetime.now().isoformat()
+    logger.info(f"[{timestamp}] ChatID: {chat_id}, User: {user}, Message: {message}")
+    print(f"[{timestamp}] ChatID: {chat_id}, User: {user}, Message: {message}")
+
+
 # 환경 변수 로드
 load_dotenv()
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID')
 PORT = int(os.environ.get('PORT', '8080'))
+
+# 허용된 채팅방 ID 리스트
+AUTHORIZED_CHAT_IDS = [-1001234567890, -1009876543210] 
+
+
 
 # Yahoo Finance API 요청 제한 처리를 위한 지연 시간 (초)
 MIN_DELAY = 2  # 최소 2초 대기
@@ -65,9 +83,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 주식의 티커 심볼을 '/p $티커' 형식으로 입력
 
 예시:
-/p AAPL (애플)
-/p MSFT (마이크로소프트)
-/p GOOGL (구글)
+/p $AAPL
+/p $MSFT
+/p $GOOGL
     """ 
     try:
         chat_id = update.effective_chat.id
@@ -138,6 +156,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chat_id = update.effective_chat.id
         
+        # 채팅 ID 확인
+        if chat_id not in AUTHORIZED_CHAT_IDS:
+            print(f"권한 없는 채팅 ID 접근 시도: {chat_id}")
+            return
+        
+        # 로그 기록
+        await log_interaction(update)
+        
         if update.message:
             text = update.message.text
             print(f"일반 채팅에서 받은 메시지: {text}")
@@ -161,7 +187,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 티커 추출 (앞의 '/p $' 제거)
         ticker = text[4:].strip().upper()
         if not ticker:
-            await context.bot.send_message(chat_id=chat_id, text="티커를 입력해주세요. 예: /p AAPL")
+            await context.bot.send_message(chat_id=chat_id, text="티커를 입력해주세요. 예: /p $AAPL")
             return
             
         print(f"처리할 티커: {ticker}")
@@ -195,13 +221,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # # 거래량 비교
             # volume_arrow, volume_ratio = calculate_volume_ratio(volume, avg_volume)
             
+            # 통화 기호 설정
+            currency_symbol = "$" if currency == "USD" else "₩" if currency == "KRW" else currency
+            
             # 응답 메시지 구성
-            response = f"""📊 {company_name} [${ticker}]
+            response = f"""📊 {company_name} [{currency_symbol}{ticker}]
 
-{price_arrow} Change: ${abs(price_change):.2f} ({change_percent:+.2f}%)
-💰 Price [{currency}]: ${current_price:.2f}
-📈 High: ${day_high:.2f}
-📉 Low: ${day_low:.2f}
+{price_arrow} Change: {currency_symbol}{abs(price_change):.2f} ({change_percent:+.2f}%)
+💰 Price [{currency}]: {currency_symbol}{current_price:.2f}
+📈 High: {currency_symbol}{day_high:.2f}
+📉 Low: {currency_symbol}{day_low:.2f}
 """
             print("응답 메시지 전송 중...")
             await context.bot.send_message(chat_id=chat_id, text=response)
