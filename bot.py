@@ -11,6 +11,9 @@ from datetime import datetime, timedelta
 from requests.exceptions import RequestException
 import random
 import asyncio
+import requests
+import threading
+
 
 # 로깅 설정
 logging.basicConfig(
@@ -30,6 +33,15 @@ async def log_interaction(update: Update):
     logger.info(f"[{timestamp}] ChatID: {chat_id}, User: {user}, Message: {message}")
     print(f"[{timestamp}] ChatID: {chat_id}, User: {user}, Message: {message}")
 
+# 주기적으로 서버에 ping을 보내는 함수
+def ping_server():
+    while True:
+        try:
+            response = requests.get("https://telebot-finance-info.onrender.com")
+            logger.info(f"서버 핑 전송 성공 - 상태 코드: {response.status_code}")
+        except Exception as e:
+            logger.error(f"서버 핑 전송 실패: {str(e)}")
+        time.sleep(300)  # 5분마다 핑 전송
 
 # 환경 변수 로드
 load_dotenv()
@@ -38,7 +50,9 @@ CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID')
 PORT = int(os.environ.get('PORT', '8080'))
 
 # 허용된 채팅방 ID 리스트
-AUTHORIZED_CHAT_IDS = [-1001234567890, -1009876543210] 
+# 7195671182 : 봇
+# -4733288399 : 테스트 채널
+AUTHORIZED_CHAT_IDS = [7195671182, -4733288399] 
 
 
 
@@ -49,6 +63,14 @@ MAX_DELAY = 5  # 최대 5초 대기
 # 캐시 저장소
 stock_cache = {}
 CACHE_DURATION = timedelta(minutes=5)  # 5분간 캐시 유지
+
+@app.on_event("startup")
+async def startup_event():
+
+    # ping 스레드 시작
+    ping_thread = threading.Thread(target=ping_server, daemon=True)
+    ping_thread.start()
+
 
 def format_large_number(number):
     """큰 숫자를 읽기 쉽게 포맷팅합니다."""
@@ -225,7 +247,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             currency_symbol = "$" if currency == "USD" else "₩" if currency == "KRW" else currency
             
             # 응답 메시지 구성
-            response = f"""📊 {company_name} [{currency_symbol}{ticker}]
+            response = f"""📊 {company_name} [${ticker}]
 
 {price_arrow} Change: {currency_symbol}{abs(price_change):.2f} ({change_percent:+.2f}%)
 💰 Price [{currency}]: {currency_symbol}{current_price:.2f}
@@ -250,14 +272,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     """봇을 실행합니다."""
-    print("봇 시작 중...")
+    logger.info("봇 시작 중...")
+    
+    # 핑 스레드 시작
+    ping_thread = threading.Thread(target=ping_server, daemon=True)
+    ping_thread.start()
+    logger.info("핑 스레드 시작됨")
+    
     application = Application.builder().token(BOT_TOKEN).build()
     
     # 모든 메시지를 하나의 핸들러로 처리
     application.add_handler(MessageHandler(filters.TEXT, handle_message))
     
     # 봇 실행
-    print("봇이 메시지 대기 중...")
+    logger.info("봇이 메시지 대기 중...")
     
     # Render.com을 위한 웹훅 설정
     if os.environ.get('RENDER'):
