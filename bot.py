@@ -16,6 +16,13 @@ import threading
 import psycopg2
 from psycopg2 import pool
 
+# 로깅 설정
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
 # PostgreSQL 연결 풀 설정
 def get_db_pool():
     try:
