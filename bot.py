@@ -43,13 +43,13 @@ def format_large_number(number):
     else:
         return f"{number:.2f}"
 
-def calculate_volume_ratio(volume, avg_volume):
-    """거래량 비율을 계산하고 화살표를 반환합니다."""
-    if avg_volume == 0:
-        return "➡️", 0
-    ratio = (volume / avg_volume - 1) * 100
-    arrow = "🔺" if ratio > 0 else "🔻" if ratio < 0 else "➡️"
-    return arrow, ratio
+# def calculate_volume_ratio(volume, avg_volume):
+#     """거래량 비율을 계산하고 화살표를 반환합니다."""
+#     if avg_volume == 0:
+#         return "➡️", 0
+#     ratio = (volume / avg_volume - 1) * 100
+#     arrow = "🔺" if ratio > 0 else "🔻" if ratio < 0 else "➡️"
+#     return arrow, ratio
 
 def is_cache_valid(ticker):
     """캐시가 유효한지 확인합니다."""
@@ -62,7 +62,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """봇 시작 시 환영 메시지를 보냅니다."""
     welcome_message = """
 🚀 똑똑이봇
-주식의 티커 심볼을 '/p 티커' 형식으로 입력
+주식의 티커 심볼을 '/p $티커' 형식으로 입력
 
 예시:
 /p AAPL (애플)
@@ -99,10 +99,8 @@ async def get_stock_data(ticker):
         previous_close = info.get('previousClose', 0)
         day_high = info.get('dayHigh', 0)
         day_low = info.get('dayLow', 0)
-        market_cap = info.get('marketCap', 0)
+        # market_cap = info.get('marketCap', 0)
         currency = info.get('currency', 'USD')
-        volume = info.get('volume', 0)
-        avg_volume = info.get('averageVolume', 0)
         
         # 회사 정보
         company_name = info.get('longName', ticker)
@@ -117,10 +115,10 @@ async def get_stock_data(ticker):
             'previous_close': previous_close,
             'day_high': day_high,
             'day_low': day_low,
-            'market_cap': market_cap,
+            # 'market_cap': market_cap,
             'currency': currency,
-            'volume': volume,
-            'avg_volume': avg_volume
+            # 'volume': volume,
+            # 'avg_volume': avg_volume
         }
         
         stock_cache[ticker] = {
@@ -156,12 +154,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
             
         # 주식 티커 명령어가 아닌 경우 무시
-        if not text.startswith('/p'):
+        if not text.startswith('/p $'):
             print("명령어가 아닌 메시지 무시")
             return
             
-        # 티커 추출 (앞의 '/p' 제거)
-        ticker = text[2:].strip().upper()
+        # 티커 추출 (앞의 '/p $' 제거)
+        ticker = text[4:].strip().upper()
         if not ticker:
             await context.bot.send_message(chat_id=chat_id, text="티커를 입력해주세요. 예: /p AAPL")
             return
@@ -177,11 +175,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             previous_close = stock_data['previous_close']
             day_high = stock_data['day_high']
             day_low = stock_data['day_low']
-            market_cap = stock_data['market_cap']
+            # market_cap = stock_data['market_cap']
             currency = stock_data['currency']
             company_name = stock_data['company_name']
-            volume = stock_data['volume']
-            avg_volume = stock_data['avg_volume']
+            # volume = stock_data['volume']
+            # avg_volume = stock_data['avg_volume']
 
             # 등락률 계산
             if previous_close > 0:
@@ -191,23 +189,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 change_percent = 0
                 price_change = 0
                 
-            # 화살표 이모지 선택
-            price_arrow = "🔺" if change_percent > 0 else "🔻" if change_percent < 0 else "➡️"
+            # 화살표 이모지 선택 (색상 변경)
+            price_arrow = "🟩" if change_percent > 0 else "🟥" if change_percent < 0 else "➡️"
             
-            # 거래량 비교
-            volume_arrow, volume_ratio = calculate_volume_ratio(volume, avg_volume)
+            # # 거래량 비교
+            # volume_arrow, volume_ratio = calculate_volume_ratio(volume, avg_volume)
             
             # 응답 메시지 구성
-            response = f"""📊 {company_name} [{ticker}]
+            response = f"""📊 {company_name} [${ticker}]
 
+{price_arrow} Change: ${abs(price_change):.2f} ({change_percent:+.2f}%)
 💰 Price [{currency}]: ${current_price:.2f}
 📈 High: ${day_high:.2f}
 📉 Low: ${day_low:.2f}
-{price_arrow} Change: ${abs(price_change):.2f} ({abs(change_percent):.2f}%)
-
-📊 Volume: {format_large_number(volume)}
-{volume_arrow} vs Avg: {format_large_number(avg_volume)} ({abs(volume_ratio):.1f}%)
-💎 Market Cap: ${format_large_number(market_cap)}
 """
             print("응답 메시지 전송 중...")
             await context.bot.send_message(chat_id=chat_id, text=response)
