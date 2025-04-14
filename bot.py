@@ -157,9 +157,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
         
         # 채팅 ID 확인
-        if chat_id not in AUTHORIZED_CHAT_IDS:
-            print(f"권한 없는 채팅 ID 접근 시도: {chat_id}")
-            return
+        # if chat_id not in AUTHORIZED_CHAT_IDS:
+        #     print(f"권한 없는 채팅 ID 접근 시도: {chat_id}")
+        #     return
         
         # 로그 기록
         await log_interaction(update)
