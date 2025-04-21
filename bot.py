@@ -62,13 +62,13 @@ def init_db():
 def save_chat_log(chat_data):
     """채팅 로그를 PostgreSQL에 저장합니다."""
     try:
-        logger.info(f"""
-=== 채팅 로그 데이터 ===
-시간: {chat_data['timestamp']}
-채팅 ID: {chat_data['chat_id']}
-사용자: {chat_data['user']}
-메시지: {chat_data['message']}
-======================""")
+#         logger.info(f"""
+# === 채팅 로그 데이터 ===
+# 시간: {chat_data['timestamp']}
+# 채팅 ID: {chat_data['chat_id']}
+# 사용자: {chat_data['user']}
+# 메시지: {chat_data['message']}
+# ======================""")
         
         conn = db_pool.getconn()
         if conn is None:
@@ -274,10 +274,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if update.message:
             text = update.message.text
-            logger.info(f"받은 메시지: {text}")  # 메시지 내용 로깅
+            # logger.info(f"받은 메시지: {text}")  # 메시지 내용 로깅
         elif update.channel_post:
             text = update.channel_post.text
-            logger.info(f"채널 메시지: {text}")  # 채널 메시지 로깅
+            # logger.info(f"채널 메시지: {text}")  # 채널 메시지 로깅
         else:
             return
             
