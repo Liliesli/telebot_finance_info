@@ -62,10 +62,17 @@ def init_db():
 def save_chat_log(chat_data):
     """채팅 로그를 PostgreSQL에 저장합니다."""
     try:
-        logger.info(f"로그 저장 시도: {chat_data}")  # 저장 시도 로깅
+        logger.info(f"""
+=== 채팅 로그 데이터 ===
+시간: {chat_data['timestamp']}
+채팅 ID: {chat_data['chat_id']}
+사용자: {chat_data['user']}
+메시지: {chat_data['message']}
+======================""")
+        
         conn = db_pool.getconn()
         if conn is None:
-            logger.error("데이터베이스 연결 실패: 연결 객체가 None입니다")
+            logger.error("데이터베이스 연결 실패")
             return
             
         with conn.cursor() as cur:
@@ -79,49 +86,29 @@ def save_chat_log(chat_data):
                 chat_data['message']
             ))
             conn.commit()
-            logger.info("로그 저장 성공")  # 저장 성공 로깅
     except Exception as e:
-        logger.error(f"채팅 로그 저장 중 오류 발생: {str(e)}")
-        logger.error(f"저장하려던 데이터: {chat_data}")  # 실패한 데이터 로깅
-        print(traceback.format_exc())
+        logger.error(f"""
+=== 채팅 로그 저장 실패 ===
+에러: {str(e)}
+시간: {chat_data['timestamp']}
+채팅 ID: {chat_data['chat_id']}
+사용자: {chat_data['user']}
+메시지: {chat_data['message']}
+========================""")
     finally:
         if conn:
             db_pool.putconn(conn)
 
-# 로그 기록용 함수
 async def log_interaction(update: Update):
     try:
-        logger.info("로그 기록 시작")  # 함수 시작 로깅
-        
-        if update is None:
-            logger.error("Update 객체가 None입니다")
-            return
-            
-        if update.effective_chat is None:
-            logger.error("effective_chat이 None입니다")
+        if not update or not update.effective_chat or not update.effective_user:
             return
             
         chat_id = update.effective_chat.id
-        logger.info(f"Chat ID: {chat_id}")  # Chat ID 로깅
-        
-        if update.effective_user is None:
-            logger.error("effective_user가 None입니다")
-            return
-            
         user = update.effective_user.username or update.effective_user.full_name
-        logger.info(f"User: {user}")  # User 로깅
-        
-        # 메시지 텍스트 추출
-        if update.message and update.message.text:
-            message = update.message.text
-            logger.info(f"메시지 텍스트: {message}")  # 메시지 내용 로깅
-        else:
-            message = "텍스트 없는 메시지"
-            logger.warning("텍스트 없는 메시지 감지")
-            
+        message = update.message.text if update.message and update.message.text else "텍스트 없는 메시지"
         timestamp = datetime.now()
         
-        # 로그 데이터 구성
         chat_data = {
             "timestamp": timestamp,
             "chat_id": chat_id,
@@ -129,24 +116,27 @@ async def log_interaction(update: Update):
             "message": message
         }
         
-        logger.info(f"저장할 로그 데이터: {chat_data}")  # 저장할 데이터 로깅
+        logger.info(f"""
+=== 새로운 메시지 수신 ===
+시간: {timestamp}
+채팅 ID: {chat_id}
+사용자: {user}
+메시지: {message}
+======================""")
         
-        # 로그 저장
         save_chat_log(chat_data)
         
     except Exception as e:
-        logger.error(f"로그 기록 중 오류 발생: {str(e)}")
-        print(traceback.format_exc())
+        logger.error(f"로그 기록 실패: {str(e)}")
 
 # 주기적으로 서버에 ping을 보내는 함수
 def ping_server():
     while True:
         try:
-            response = requests.get("https://telebot-finance-info.onrender.com")
-            # logger.info(f"서버 핑 전송 성공 - 상태 코드: {response.status_code}")
+            requests.get("https://telebot-finance-info.onrender.com")
         except Exception as e:
             logger.error(f"서버 핑 전송 실패: {str(e)}")
-        time.sleep(300)  # 5분마다 핑 전송
+        time.sleep(300)
 
 # 환경 변수 로드
 load_dotenv()
@@ -216,9 +206,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def get_stock_data(ticker):
     """주식 정보를 안정적으로 가져옵니다."""
-    # 캐시 확인
     if is_cache_valid(ticker):
-        print(f"{ticker} 캐시된 데이터 사용")
         return stock_cache[ticker]['data']
     
     try:
@@ -281,17 +269,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 채팅 ID 확인
         if chat_id not in AUTHORIZED_CHAT_IDS:
-            logger.warning(f"권한 없는 채팅 ID 접근 시도: {chat_id}")
+            logger.warning(f"미승인 채팅 ID 접근: {chat_id}")
             return
         
         if update.message:
             text = update.message.text
-            logger.info(f"일반 채팅에서 받은 메시지: {text}")
+            logger.info(f"받은 메시지: {text}")  # 메시지 내용 로깅
         elif update.channel_post:
             text = update.channel_post.text
-            logger.info(f"채널에서 받은 메시지: {text}")
+            logger.info(f"채널 메시지: {text}")  # 채널 메시지 로깅
         else:
-            logger.warning("처리할 수 없는 메시지 유형")
             return
             
         # /start 명령어 처리
@@ -301,7 +288,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         # 주식 티커 명령어가 아닌 경우 무시
         if not text.startswith('/p $'):
-            logger.info("명령어가 아닌 메시지 무시")
             return
             
         # 티커 추출 (앞의 '/p $' 제거)
@@ -310,8 +296,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=chat_id, text="티커를 입력해주세요. 예: /p $AAPL")
             return
             
-        logger.info(f"처리할 티커: {ticker}")
-        
         try:
             # 주식 정보 가져오기
             print(f"{ticker} 정보 가져오는 중...")
