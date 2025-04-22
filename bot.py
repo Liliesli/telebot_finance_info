@@ -269,6 +269,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 채팅 ID 확인
         if chat_id not in AUTHORIZED_CHAT_IDS:
+            timestamp = datetime.now()
+            user = update.effective_user.username or update.effective_user.full_name
+            message = update.message.text if update.message and update.message.text else "텍스트 없는 메시지"
+            logger.info(f"""
+=== 새로운 메시지 수신 ===
+시간: {timestamp}
+채팅 ID: {chat_id}
+사용자: {user}
+메시지: {message}
+======================""")
             logger.warning(f"미승인 채팅 ID 접근: {chat_id}")
             return
         
