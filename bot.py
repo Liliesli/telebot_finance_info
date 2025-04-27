@@ -267,29 +267,53 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 로그 기록 (권한 체크 전에 수행)
         await log_interaction(update)
         
+        # 텍스트 메시지 확인
+        text = None
+        if update.message and update.message.text:
+            text = update.message.text
+        elif update.channel_post and update.channel_post.text:
+            text = update.channel_post.text
+            
+        # 사용자 정보 가져오기
+        user = update.effective_user.username or update.effective_user.full_name if update.effective_user else "알 수 없는 사용자"
+        
         # 채팅 ID 확인
         if chat_id not in AUTHORIZED_CHAT_IDS:
-            timestamp = datetime.now()
-            user = update.effective_user.username or update.effective_user.full_name
-            message = update.message.text if update.message and update.message.text else "텍스트 없는 메시지"
-            logger.info(f"""
-=== 새로운 메시지 수신 ===
-시간: {timestamp}
+            logger.warning(f"""
+=== 미승인 접근 감지 ===
+시간: {datetime.now()}
 채팅 ID: {chat_id}
 사용자: {user}
-메시지: {message}
+메시지: {text if text else "텍스트 없음"}
 ======================""")
-            logger.warning(f"미승인 채팅 ID 접근: {chat_id}")
-            # return
-        
-        if update.message:
-            text = update.message.text
-            # logger.info(f"받은 메시지: {text}")  # 메시지 내용 로깅
-        elif update.channel_post:
-            text = update.channel_post.text
-            # logger.info(f"채널 메시지: {text}")  # 채널 메시지 로깅
-        else:
+            
+            # 미승인 사용자에게 메시지 전송
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text="미승인 채팅ID"
+                )
+            except Exception as e:
+                logger.error(f"미승인 사용자에게 메시지 전송 실패: {str(e)}")
             return
+        
+        # 텍스트가 없는 경우 처리 종료
+        if not text:
+            logger.info(f"""
+=== 텍스트 없는 메시지 ===
+시간: {datetime.now()}
+채팅 ID: {chat_id}
+사용자: {user}
+======================""")
+            return
+            
+        logger.info(f"""
+=== 메시지 수신 ===
+시간: {datetime.now()}
+채팅 ID: {chat_id}
+사용자: {user}
+메시지: {text}
+======================""")
             
         # /start 명령어 처리
         if text.lower() == '/start':
@@ -300,7 +324,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not text.startswith('/p $'):
             return
             
-        # 티커 추출 (앞의 '/p $' 제거)
+        # 티커 추출
         ticker = text[4:].strip().upper()
         if not ticker:
             await context.bot.send_message(chat_id=chat_id, text="티커를 입력해주세요. 예: /p $AAPL")
