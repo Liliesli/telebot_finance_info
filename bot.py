@@ -280,7 +280,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 메시지: {message}
 ======================""")
             logger.warning(f"미승인 채팅 ID 접근: {chat_id}")
-            return
+            # return
         
         if update.message:
             text = update.message.text
